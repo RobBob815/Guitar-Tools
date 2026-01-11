@@ -1,0 +1,561 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fretboard Interval Trainer — Triad & Dominant Color Mode</title>
+<style>
+:root{
+  --bg:#0e1117; --panel:#0f1422; --line:#2a2f3a; --muted:#b7bdc9;
+  --card:#1a1f2e; --edge:#2a3147; --blue:#4c8fff; --warn:#ff786c; --ok:#6dff9b;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:#e6e8ee}
+header{padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel);display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:0;z-index:5}
+h1{margin:0;font-size:18px;letter-spacing:.2px}
+.timerBadge{min-width:84px;text-align:center;border-radius:999px;background:#20263a;border:1px solid #394062;padding:8px 12px;font-weight:700;font-variant-numeric:tabular-nums;font-size:20px}
+.timerBadge.ok{color:#cfe7ff}
+.timerBadge.low{color:#ffe08a;border-color:#725a2a}
+.timerBadge.crit{color:#ffb3ac;border-color:#8a3030;background:#261b1b}
+
+.controls{display:flex;flex-wrap:wrap;gap:8px;padding:10px 16px;border-bottom:1px solid var(--line);background:#0f1422}
+.controls label{display:flex;align-items:center;gap:6px;background:#171c2a;border:1px solid #2c3344;border-radius:10px;padding:8px 10px}
+.controls select,.controls input[type=number]{background:transparent;border:none;color:#e6e8ee;outline:none;min-width:60px}
+button{background:var(--blue);color:#fff;border:none;border-radius:10px;padding:8px 12px;cursor:pointer}
+button.ghost{background:transparent;border:1px solid #3b4580;color:#b7c5ff}
+button.warn{background:#e06262}
+
+.status{padding:8px 16px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+.legend{padding:8px 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;border-radius:999px;color:#111;font-weight:700;margin-right:2px;padding:0 6px;font-size:12px}
+.deg1{background:#ff5b5b}.deg2{background:#6dff9b}.deg3{background:#ffd166}.deg4{background:#b58bff}.deg5{background:#66a3ff}.deg6{background:#ff9f6e}.deg7{background:#ff6ed6}
+.req{outline:2px solid #fff; box-shadow:0 0 0 2px rgba(255,255,255,0.2)}
+.domColorPill{background:#20263a;border:1px dashed #ffb86c;color:#ffdcaa}
+
+.boardWrap{display:grid;grid-template-columns:40px 1fr;gap:10px;align-items:stretch;padding:12px 16px}
+.nut{display:grid;grid-template-rows:repeat(6,48px);gap:8px}
+.nut span{display:flex;align-items:center;justify-content:center;opacity:.8}
+.grid{display:grid;grid-template-columns:repeat(var(--cols),1fr);grid-template-rows:repeat(6,48px);gap:8px;background:var(--card);border:1px solid var(--edge);border-radius:12px;padding:10px}
+.fret{position:relative;border-left:1px solid #2b3246}.string{position:absolute;left:0;right:0;top:calc(50% - 1px);height:2px;background:#2b3246}
+.dot{width:28px;height:28px;border-radius:999px;margin:auto;background:#0e1117;border:1px dashed #414a67;color:#0e1117;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:opacity .15s}
+.dot.disabled{opacity:.25;cursor:not-allowed}
+.dot.revealed{border:1px solid transparent;color:#111;font-weight:800}
+.dot.wrong{border-color:#7d2a2a;background:#2a1515}
+.locked .dot{pointer-events:none;opacity:.7}
+.deg1.revealed{background:#ff5b5b}.deg2.revealed{background:#6dff9b}.deg3.revealed{background:#ffd166}.deg4.revealed{background:#b58bff}.deg5.revealed{background:#66a3ff}.deg6.revealed{background:#ff9f6e}.deg7.revealed{background:#ff6ed6}
+
+/* dominant color note (Ionian b7 / V Mixo b3) */
+.domColor{background:#111522;border:1px dashed #ffb86c}
+.domColor.revealed{background:#ffb86c;color:#111;font-weight:800;border-color:#ffb86c}
+
+@media (max-width:640px){
+  .controls{gap:6px;padding:8px 12px}
+  .controls label{padding:6px 8px}
+  .timerBadge{min-width:72px;font-size:18px;padding:6px 10px}
+}
+</style>
+</head>
+<body>
+<header>
+<div style="padding:10px 16px;">
+  <button onclick="location.href='index.html'"
+    style="
+      background:#163152;
+      color:#e8eef7;
+      border:1px solid #274b7d;
+      border-radius:8px;
+      padding:8px 12px;
+      font-size:13px;
+      cursor:pointer;
+    ">
+    ← Home
+  </button>
+</div>
+  <h1>Fretboard Interval Trainer — Triad & Dominant Color Mode</h1>
+  <div id="timerBadge" class="timerBadge ok">—</div>
+</header>
+
+<section class="controls">
+  <label>Mode
+    <select id="mode">
+      <option value="interval" selected>Interval</option>
+      <option value="triad">Triad Builder (Ionian)</option>
+      <option value="domColor">Dominant Color (♭7 / ♭3)</option>
+    </select>
+  </label>
+  <label>Key <select id="keySel"><option>C</option><option>C#</option><option>D</option><option>Eb</option><option>E</option><option>F</option><option>F#</option><option>G</option><option>Ab</option><option>A</option><option>Bb</option><option>B</option></select></label>
+  <label>Start <input id="startFret" type="number" value="5" min="0" max="20"></label>
+  <button id="randomStart" class="ghost">🎲 Random Start</button>
+  <label>Span <select id="span"><option>5</option><option selected>6</option><option>7</option></select></label>
+  <label>Timer (s) <input id="timerSec" type="number" min="0" max="120" value="0" style="width:60px"></label>
+  <button id="newRound">New Round</button>
+  <button id="reveal" class="ghost">Reveal</button>
+  <button id="reset" class="ghost">Reset</button>
+</section>
+
+<section class="status">
+  <span id="prompt">Prompt: —</span>
+  <span>Round <span id="roundNum">0</span></span>
+  <span>Found <span id="found">0</span>/<span id="total">0</span></span>
+  <span>Score <span id="score">0</span></span>
+  <span>Acc <span id="acc">—</span></span>
+  <span>Time <span id="time" class="timer">—</span></span>
+</section>
+
+<div class="legend" id="legend">
+  <span class="pill deg1" data-deg="1">1</span>
+  <span class="pill deg2" data-deg="2">2</span>
+  <span class="pill deg3" data-deg="3">3</span>
+  <span class="pill deg4" data-deg="4">4</span>
+  <span class="pill deg5" data-deg="5">5</span>
+  <span class="pill deg6" data-deg="6">6</span>
+  <span class="pill deg7" data-deg="7">7</span>
+  <span class="pill domColorPill" id="domColorPill">♭7 / ♭3</span>
+</div>
+
+<div class="boardWrap">
+  <div class="nut">
+    <span>e</span><span>B</span><span>G</span><span>D</span><span>A</span><span>E</span>
+  </div>
+  <div id="fretboard"></div>
+</div>
+
+<script>
+// ===== Core data & state =====
+const modeSel=document.getElementById('mode');
+const keySel=document.getElementById('keySel'),
+      startFretEl=document.getElementById('startFret'),
+      spanSel=document.getElementById('span'),
+      board=document.getElementById('fretboard');
+const newRoundBtn=document.getElementById('newRound'),
+      revealBtn=document.getElementById('reveal'),
+      resetBtn=document.getElementById('reset'),
+      randomStartBtn=document.getElementById('randomStart');
+const promptEl=document.getElementById('prompt'),
+      roundNumEl=document.getElementById('roundNum'),
+      foundEl=document.getElementById('found'),
+      totalEl=document.getElementById('total'),
+      scoreEl=document.getElementById('score'),
+      accEl=document.getElementById('acc'),
+      timeEl=document.getElementById('time');
+const timerSec=document.getElementById('timerSec');
+const legend=document.getElementById('legend');
+const timerBadge=document.getElementById('timerBadge');
+const domColorPill=document.getElementById('domColorPill');
+
+const OPEN_MIDI=[40,45,50,55,59,64]; // E A D G B e
+const ROW_ORDER=[5,4,3,2,1,0];
+const DEGREE_NAMES=['1','2','3','4','5','6','7'];
+const DEGREE_CLASSES=['deg1','deg2','deg3','deg4','deg5','deg6','deg7'];
+const MAJOR_STEPS=[0,2,4,5,7,9,11];
+const TRIADS={
+  1:[1,3,5],
+  2:[2,4,6],
+  3:[3,5,7],
+  4:[4,6,1],
+  5:[5,7,2],
+  6:[6,1,3],
+  7:[7,2,4]
+};
+const TRIAD_LABELS={
+  1:'I (major): 1,3,5',
+  2:'ii (minor): 2,4,6',
+  3:'iii (minor): 3,5,7',
+  4:'IV (major): 4,6,1',
+  5:'V (major): 5,7,2',
+  6:'vi (minor): 6,1,3',
+  7:'vii° (dim): 7,2,4'
+};
+
+let state={
+  mode:'interval',
+  cols:6,
+  startFret:5,
+  keyPc:9,
+  targetDeg:0,
+  targetTriad:null,
+  round:0,
+  found:0,
+  total:0,
+  score:0,
+  attempts:0,
+  targetSet:new Set(),
+  clicked:new Set(),
+  timer:null,
+  remaining:0,
+  lock:false
+};
+
+function noteNameToPc(n){
+  const m={
+    'C':0,'C#':1,'Db':1,'D':2,'Eb':3,'E':4,
+    'F':5,'F#':6,'Gb':6,'G':7,'Ab':8,'A':9,
+    'Bb':10,'B':11
+  };
+  return m[n];
+}
+function cellId(s,fret){return s+'-'+fret}
+function rndInt(a,b){return Math.floor(Math.random()*(b-a+1))+a}
+
+// ===== Board build =====
+function buildBoard(){
+  state.startFret=parseInt(startFretEl.value,10);
+  state.cols=parseInt(spanSel.value,10);
+  state.keyPc=noteNameToPc(keySel.value);
+  state.clicked=new Set();
+
+  board.innerHTML='';
+  const grid=document.createElement('div');
+  grid.className='grid';
+  grid.style.setProperty('--cols',state.cols);
+
+  const ionianB7Pc=(state.keyPc+10)%12; // major ♭7
+
+  for(const s of ROW_ORDER){
+    for(let c=0;c<state.cols;c++){
+      const fret=state.startFret+c;
+      const midi=OPEN_MIDI[s]+fret;
+      const pc=midi%12;
+      const offset=(pc-state.keyPc+12)%12;
+      const idx=MAJOR_STEPS.indexOf(offset);
+      const inScale=idx!==-1;
+
+      const cell=document.createElement('div');
+      cell.className='fret';
+      const stringLine=document.createElement('div');
+      stringLine.className='string';
+      cell.appendChild(stringLine);
+
+      const dot=document.createElement('div');
+      dot.className='dot';
+      dot.dataset.s=s;
+      dot.dataset.fret=fret;
+      dot.dataset.id=cellId(s,fret);
+
+      // scale degree (Ionian) if in scale
+      if(inScale){
+        dot.dataset.inScale='1';
+        dot.dataset.degree=(idx+1);
+        dot.title=`String ${s+1}, Fret ${fret}`;
+      }else{
+        dot.dataset.inScale='0';
+      }
+
+      // dominant color note: Ionian ♭7 (also V Mixo ♭3)
+      let color='';
+      if(pc===ionianB7Pc){
+        color='b7';
+      }
+      dot.dataset.color=color;
+
+      // visibility / disabled rules:
+      // - inScale notes always visible
+      // - color notes only visible in domColor mode
+      if(!inScale){
+        if(state.mode==='domColor' && color==='b7'){
+          // keep visible & clickable in dominant color mode
+          dot.title=`Dominant color: Ionian ♭7 / V Mixo ♭3 · String ${s+1}, Fret ${fret}`;
+        }else{
+          dot.classList.add('disabled');
+          dot.style.visibility='hidden';
+        }
+      }
+
+      cell.appendChild(dot);
+      grid.appendChild(cell);
+    }
+  }
+  board.appendChild(grid);
+  attachClickHandlers();
+}
+function attachClickHandlers(){
+  board.querySelectorAll('.dot').forEach(d=>d.addEventListener('click',()=>handleClick(d)));
+}
+
+// ===== Round / target logic =====
+function resetLegendHighlight(){
+  legend.querySelectorAll('.pill').forEach(p=>p.classList.remove('req'));
+}
+function highlightLegend(degList){
+  resetLegendHighlight();
+  degList.forEach(d=>{
+    const el=legend.querySelector(`.pill[data-deg="${d}"]`);
+    if(el) el.classList.add('req');
+  });
+}
+function highlightDomColor(){
+  resetLegendHighlight();
+  if(domColorPill) domColorPill.classList.add('req');
+}
+
+function computeTargets(){
+  state.targetSet=new Set();
+  const dots=[...board.querySelectorAll('.dot')];
+
+  if(state.mode==='interval'){
+    dots.forEach(d=>{
+      if(d.dataset.inScale==='1' &&
+         parseInt(d.dataset.degree,10)===state.targetDeg){
+        state.targetSet.add(d.dataset.id);
+      }
+    });
+    promptEl.textContent=`Prompt: Select all the ${DEGREE_NAMES[state.targetDeg-1]}s`;
+    highlightLegend([state.targetDeg]);
+  }else if(state.mode==='triad'){
+    const need=TRIADS[state.targetTriad];
+    dots.forEach(d=>{
+      if(d.dataset.inScale==='1'){
+        const deg=parseInt(d.dataset.degree,10);
+        if(need.includes(deg)){
+          state.targetSet.add(d.dataset.id);
+        }
+      }
+    });
+    const label=TRIAD_LABELS[state.targetTriad];
+    promptEl.textContent=`Prompt: Build ${label} — select all ${TRIADS[state.targetTriad].join(', ')}s`;
+    highlightLegend(need);
+  }else if(state.mode==='domColor'){
+    dots.forEach(d=>{
+      if(d.dataset.color==='b7'){
+        state.targetSet.add(d.dataset.id);
+      }
+    });
+    promptEl.textContent='Prompt: Select all Ionian ♭7 / V Mixolydian ♭3 tones';
+    highlightDomColor();
+  }
+
+  state.total=state.targetSet.size;
+  totalEl.textContent=state.total;
+}
+
+// ===== Timer =====
+function startTimer(){
+  stopTimer();
+  const sec=parseInt(timerSec.value,10)||0;
+  state.remaining=sec;
+  updateTime();
+  if(sec<=0){
+    timerBadge.textContent='—';
+    return;
+  }
+  state.timer=setInterval(()=>{
+    state.remaining--;
+    updateTime();
+    timerBadge.classList.remove('ok','low','crit');
+    if(state.remaining<=0){
+      timerBadge.classList.add('crit');
+      timerBadge.textContent='0';
+      stopTimer();
+      lockBoard(true);
+      promptEl.textContent+=' • Time up';
+    }else if(state.remaining<=5){
+      timerBadge.classList.add('crit');
+    }else if(state.remaining<=10){
+      timerBadge.classList.add('low');
+    }else{
+      timerBadge.classList.add('ok');
+    }
+  },1000);
+  timerBadge.classList.remove('ok','low','crit');
+  timerBadge.classList.add('ok');
+}
+function stopTimer(){
+  if(state.timer){
+    clearInterval(state.timer);
+    state.timer=null;
+  }
+}
+function updateTime(){
+  timeEl.textContent=state.remaining>0?state.remaining+'s':'—';
+  timerBadge.textContent=state.remaining>0?state.remaining:'—';
+}
+
+// ===== Interaction =====
+function lockBoard(on){
+  state.lock=on;
+  board.classList.toggle('locked',on);
+}
+
+function startRound(){
+  buildBoard();
+  state.round++;
+  state.found=0;
+  state.clicked=new Set();
+  lockBoard(false);
+
+  if(state.mode==='interval'){
+    state.targetDeg=rndInt(1,7);
+    state.targetTriad=null;
+  }else if(state.mode==='triad'){
+    state.targetTriad=rndInt(1,7);
+    state.targetDeg=0;
+  }else if(state.mode==='domColor'){
+    state.targetDeg=0;
+    state.targetTriad=null;
+  }
+
+  roundNumEl.textContent=state.round;
+  foundEl.textContent='0';
+  computeTargets();
+  startTimer();
+}
+
+function handleClick(dot){
+  if(state.lock) return;
+
+  // Click filtering per mode
+  if(state.mode!=='domColor' && dot.dataset.inScale!=='1') return;
+  if(state.mode==='domColor' && !dot.dataset.color) return;
+
+  const id=dot.dataset.id;
+  const deg = dot.dataset.degree ? parseInt(dot.dataset.degree,10) : null;
+
+  state.attempts++;
+
+  let ok=false;
+  if(state.mode==='interval'){
+    ok = (deg===state.targetDeg);
+  }else if(state.mode==='triad'){
+    ok = TRIADS[state.targetTriad].includes(deg);
+  }else if(state.mode==='domColor'){
+    ok = (dot.dataset.color==='b7');
+  }
+
+  if(ok && state.targetSet.has(id)){
+    if(!state.clicked.has(id)){
+      state.clicked.add(id);
+      state.found++;
+      foundEl.textContent=state.found;
+      state.score++;
+      scoreEl.textContent=state.score;
+
+      if(state.mode==='domColor'){
+        dot.classList.add('revealed','domColor');
+        dot.textContent='♭7';
+      }else{
+        dot.classList.add('revealed',DEGREE_CLASSES[deg-1]);
+        dot.textContent=DEGREE_NAMES[deg-1];
+      }
+    }
+    if(state.found===state.total){
+      promptEl.textContent+=' • Done';
+      lockBoard(true);
+      stopTimer();
+    }
+  }else{
+    dot.classList.add('wrong');
+    setTimeout(()=>dot.classList.remove('wrong'),450);
+  }
+  updateAccuracy();
+}
+
+function revealAll(){
+  board.querySelectorAll('.dot').forEach(d=>{
+    const isScale = d.dataset.inScale==='1';
+    const isColor = (state.mode==='domColor' && d.dataset.color);
+    if(isScale || isColor){
+      if(state.mode==='domColor' && d.dataset.color==='b7'){
+        d.classList.add('revealed','domColor');
+        d.textContent='♭7';
+      }else if(isScale){
+        const deg=parseInt(d.dataset.degree,10);
+        d.classList.add('revealed',DEGREE_CLASSES[deg-1]);
+        d.textContent=DEGREE_NAMES[deg-1];
+      }
+    }
+  });
+  lockBoard(true);
+  stopTimer();
+}
+
+function updateAccuracy(){
+  if(state.attempts===0){
+    accEl.textContent='—';
+  }else{
+    accEl.textContent=Math.round((state.score/state.attempts)*100)+'%';
+  }
+}
+
+function randomizeStart(){
+  const span=parseInt(spanSel.value,10);
+  const max=Math.max(0,21-span);
+  const r=Math.floor(Math.random()*(max+1));
+  startFretEl.value=r;
+  buildBoard();
+  computeTargets();
+}
+
+// ===== Event wiring =====
+modeSel.addEventListener('change',()=>{
+  state.mode=modeSel.value;
+  startRound();
+});
+[keySel,startFretEl,spanSel].forEach(el=>el.addEventListener('change',()=>{
+  buildBoard();
+  computeTargets();
+}));
+newRoundBtn.addEventListener('click',startRound);
+revealBtn.addEventListener('click',revealAll);
+resetBtn.addEventListener('click',()=>{
+  state.score=0;
+  state.attempts=0;
+  updateAccuracy();
+  scoreEl.textContent=0;
+  roundNumEl.textContent=0;
+  promptEl.textContent='Prompt: —';
+  foundEl.textContent='0';
+  totalEl.textContent='0';
+  stopTimer();
+  lockBoard(false);
+  resetLegendHighlight();
+});
+randomStartBtn.addEventListener('click',randomizeStart);
+
+// initial
+buildBoard();
+</script>
+
+<style>
+.helpWrap{max-width:980px;margin:14px auto 40px auto;padding:0 12px}
+.disclosure{background:#171c2a;border:1px solid #2c3344;border-radius:12px;overflow:hidden}
+.disclosure summary{list-style:none;cursor:pointer;padding:12px 14px;font-weight:700;display:flex;align-items:center;justify-content:space-between}
+.disclosure summary::-webkit-details-marker{display:none}
+.disclosure .content{padding:12px 14px 16px 14px;border-top:1px solid #2c3344;color:#b7bdc9}
+.disclosure h3{margin:8px 0 6px 0;font-size:16px}
+.disclosure ol{margin:6px 0 12px 20px}
+.disclosure li{margin:4px 0}
+.kbd{display:inline-block;padding:2px 6px;border:1px solid:#3b4580;border-radius:6px;font-size:12px;background:#111522;color:#cfe7ff}
+.tip{background:#0f1422;border:1px dashed #2a3147;border-radius:10px;padding:8px 10px;margin-top:8px}
+</style>
+
+<div class="helpWrap">
+  <details class="disclosure">
+    <summary>How to Use <span>▼</span></summary>
+    <div class="content">
+      <h3>Basics</h3>
+      <ol>
+        <li>Pick a <b>Mode</b> (Interval, Triad, or Dominant Color) and a <b>Key</b>.</li>
+        <li>Set a <b>Start</b> fret (or hit <b>🎲 Random Start</b>) and choose the <b>Span</b> of frets to view.</li>
+        <li>Press <b>New Round</b>. The legend highlights the target degree(s) or color tone.</li>
+        <li>Click notes on the fretboard that match the prompt. Wrong picks flash red.</li>
+        <li>Stuck? Hit <b>Reveal</b> to show every in-scale (and, in Dominant Color mode, every color) degree.</li>
+      </ol>
+
+      <h3>Modes</h3>
+      <ul>
+        <li><b>Interval:</b> “Select all the 6s” — find every instance of that degree in view.</li>
+        <li><b>Triad Builder (Ionian):</b> Prompts a diatonic chord (I, ii, iii, IV, V, vi, vii°). Select all its chord tones (e.g., <i>ii → 2,4,6</i>).</li>
+        <li><b>Dominant Color (♭7 / ♭3):</b> Shows and targets the Ionian ♭7, which is also the ♭3 of the V Mixolydian — perfect for dominant 7 harmony and chicken-pickin lines.</li>
+      </ul>
+
+      <h3>Timer</h3>
+      <p>Set <b>Timer (s)</b> and start a round. The big badge in the header counts down. When it hits zero, the board locks.</p>
+
+      <div class="tip"><b>Practice tips</b><br>
+      In <b>Dominant Color</b> mode, set the key (e.g., C), then mentally treat the V chord (G) as your soloing center. All highlighted notes are both <i>C Ionian ♭7</i> and <i>G Mixolydian ♭3</i> — bend them into the major 3 for instant country/blues flavor.</div>
+    </div>
+  </details>
+</div>
+
+</body>
+</html>

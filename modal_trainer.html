@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Modal Color Trainer (Ionian Labels + Dim Out-of-Scale)</title>
+  <style>
+    :root {
+      --bg:#0b0f14; --fg:#e8eef7; --muted:#9aa7b6;
+      --panel:#121a24; --panel2:#0f1620; --line:#223044;
+      --good:#39d98a; --bad:#ff5c7a;
+      --dimBg:#0b1017; --dimBorder:#182233; --dimText:#5f6b7a;
+      --inBg:#111c2a; --inBorder:#223044; --inText:#e8eef7;
+    }
+
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:var(--bg); color:var(--fg); }
+    header { padding:14px 16px; border-bottom:1px solid var(--line); background:linear-gradient(180deg, #0f1620, #0b0f14); }
+    header h1 { margin:0; font-size:16px; }
+    header p { margin:6px 0 0; color:var(--muted); font-size:13px; }
+
+    .wrap { display:grid; grid-template-columns: 380px 1fr; gap:14px; padding:14px; }
+    @media (max-width: 980px) { .wrap { grid-template-columns: 1fr; } }
+
+    .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px; }
+    label { font-size:12px; color:var(--muted); display:block; margin-bottom:4px; }
+    select, button {
+      background:var(--panel2); color:var(--fg); border:1px solid var(--line); border-radius:8px;
+      padding:8px 10px; font-size:13px;
+    }
+    button { cursor:pointer; }
+    button.primary { background:#163152; border-color:#274b7d; }
+
+    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:end; }
+    .row .grow { flex: 1 1 auto; min-width: 160px; }
+
+    .prompt {
+      display:flex; align-items:baseline; justify-content:space-between; gap:12px;
+      padding:12px; border-radius:10px; background:#0f1a27; border:1px solid #1f3350;
+      margin-bottom:10px;
+    }
+    .prompt .mode { font-size:22px; font-weight:700; }
+    .prompt .root { color:var(--muted); font-size:13px; }
+
+    .hint { padding:10px; border-radius:10px; background:#0d141e; border:1px dashed #28415f; color:var(--muted); font-size:13px; line-height:1.4; }
+    .hint strong { color:var(--fg); }
+
+    .divider { height:1px; background:var(--line); margin:10px 0; }
+    .small { font-size:12px; color:var(--muted); }
+
+    .fretboard { overflow:auto; }
+
+    /* --- Fretboard grid --- */
+    .fbGrid {
+      display: grid;
+      gap: 6px;
+      align-items: center;
+      justify-items: center;
+      grid-auto-rows: 40px;
+      min-width: max-content;
+    }
+    .fbLabel {
+      justify-self: end;
+      padding-right: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .fbFret { color: var(--muted); font-size: 11px; }
+
+    .cell {
+      width:44px; height:34px; border-radius:8px; border:1px solid var(--line);
+      display:flex; align-items:center; justify-content:center;
+      font-size:12px; position:relative; user-select:none;
+      transition: opacity .12s ease;
+    }
+    .cell .deg { position:absolute; bottom:2px; right:4px; font-size:10px; opacity:.9; }
+
+    /* NEW: Out-of-scale cells are dimmed by default */
+    .outScale {
+      background: var(--dimBg);
+      border-color: var(--dimBorder);
+      color: var(--dimText);
+      opacity: .45;
+    }
+    /* In-scale cells are bright */
+    .inScale {
+      background: var(--inBg);
+      border-color: var(--inBorder);
+      color: var(--inText);
+      opacity: 1;
+    }
+    .inScale .deg { color: var(--muted); }
+    .outScale .deg { display:none; } /* keep clutter down */
+
+    .rootNote { outline:2px solid #3b78d8; outline-offset:0; opacity:1; }
+    .rootNote.outScale, .rootNote.inScale { opacity:1; } /* root should always pop */
+
+    .identity { background:#1e2f24 !important; border-color:#2d6a46 !important; opacity:1 !important; }
+    .identity::after{
+      content:""; position:absolute; top:4px; left:4px; width:8px; height:8px; border-radius:50%;
+      background:var(--good);
+    }
+
+    .avoid { background:#2b1820 !important; border-color:#6e2a3f !important; opacity:1 !important; }
+    .avoid::after{
+      content:""; position:absolute; top:4px; left:4px; width:8px; height:8px; border-radius:50%;
+      background:var(--bad);
+    }
+
+    /* Toggle UI */
+    .toggle {
+      display:flex; align-items:center; gap:10px;
+      padding:8px 10px; border-radius:8px;
+      background:var(--panel2); border:1px solid var(--line);
+      font-size:13px; color:var(--fg);
+    }
+    .toggle input { transform: scale(1.1); }
+    .toggle .sub { color: var(--muted); font-size:12px; }
+  </style>
+</head>
+<body>
+  <header>
+<div style="padding:10px 16px;">
+  <button onclick="location.href='index.html'"
+    style="
+      background:#163152;
+      color:#e8eef7;
+      border:1px solid #274b7d;
+      border-radius:8px;
+      padding:8px 12px;
+      font-size:13px;
+      cursor:pointer;
+    ">
+    ← Home
+  </button>
+</div>
+    <h1>Modal Color Trainer</h1>
+    <p>Ionian-parent degree labels + dim out-of-scale notes (guitarist orientation: e B G D A E).</p>
+  </header>
+
+  <div class="wrap">
+    <div class="card">
+      <div class="row">
+        <div>
+          <label for="rootSel">Mode Root</label>
+          <select id="rootSel"></select>
+        </div>
+        <div>
+          <label for="modeSel">Mode</label>
+          <select id="modeSel"></select>
+        </div>
+        <div>
+          <label>&nbsp;</label>
+          <button id="randomBtn" class="primary">Random Prompt</button>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="row">
+        <div class="grow">
+          <div class="toggle">
+            <input id="showContrast" type="checkbox" checked />
+            <div>
+              <div><b>Show contrast notes</b></div>
+              <div class="sub">Optional red “competing” notes (e.g., Mixolydian ♭7 vs major 7).</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="prompt">
+        <div>
+          <div class="mode" id="promptMode">A Mixolydian</div>
+          <div class="root" id="promptMeta">Parent: D Ionian • A = degree 5</div>
+        </div>
+      </div>
+
+      <div class="hint" id="hintBox"></div>
+
+      <div class="divider"></div>
+      <div class="small">
+        Grey = not in scale. Bright = in scale. Green = target. Blue outline = mode root. Red (optional) = contrast.
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="fretboard" id="fretboard"></div>
+    </div>
+  </div>
+
+  <script>
+    const NOTES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+    const NOTE_TO_PC = Object.fromEntries(NOTES.map((n,i)=>[n,i]));
+
+    const STRINGS_LOW_TO_HIGH = [
+      { name: "E", pc: NOTE_TO_PC["E"] },
+      { name: "A", pc: NOTE_TO_PC["A"] },
+      { name: "D", pc: NOTE_TO_PC["D"] },
+      { name: "G", pc: NOTE_TO_PC["G"] },
+      { name: "B", pc: NOTE_TO_PC["B"] },
+      { name: "e", pc: NOTE_TO_PC["E"] }
+    ];
+    const STRINGS_DISPLAY = [...STRINGS_LOW_TO_HIGH].reverse(); // e..E
+
+    const DEGREE_TO_SEMITONES = {
+      "1":0, "b2":1, "2":2, "b3":3, "3":4, "4":5, "#4":6, "b5":6, "5":7, "b6":8, "6":9, "b7":10, "7":11
+    };
+
+    const MODES = [
+      { name:"Ionian",     degrees:["1","2","3","4","5","6","7"],      target:["7"],        contrast:[],        blurb:"Major. (Reference sound.)" },
+      { name:"Dorian",     degrees:["1","2","b3","4","5","6","b7"],    target:["6"],        contrast:["b6"],    blurb:"Minor + natural 6 (the lift)." },
+      { name:"Phrygian",   degrees:["1","b2","b3","4","5","b6","b7"],  target:["b2"],       contrast:["2"],     blurb:"Dark/Spanish; b2 is the tell." },
+      { name:"Lydian",     degrees:["1","2","3","#4","5","6","7"],     target:["#4"],       contrast:["4"],     blurb:"Floaty; #4 is the whole point." },
+      { name:"Mixolydian", degrees:["1","2","3","4","5","6","b7"],     target:["b7"],       contrast:["7"],     blurb:"Dominant/rock; b7 is the tell." },
+      { name:"Aeolian",    degrees:["1","2","b3","4","5","b6","b7"],   target:["b6"],       contrast:["6"],     blurb:"Natural minor; b6 gives the weight." },
+      { name:"Locrian",    degrees:["1","b2","b3","4","b5","b6","b7"], target:["b5"],       contrast:["5"],     blurb:"Unstable; b5 defines it." }
+    ];
+
+    const MODE_TO_IONIAN_ROOT_DEGREE = { Ionian:1, Dorian:2, Phrygian:3, Lydian:4, Mixolydian:5, Aeolian:6, Locrian:7 };
+    const MAJOR_DEGREE_STEPS = [0, 2, 4, 5, 7, 9, 11];
+
+    function pcToNote(pc){ return NOTES[(pc+12)%12]; }
+    function degreesToPCs(rootPC, degrees){ return degrees.map(d => (rootPC + DEGREE_TO_SEMITONES[d]) % 12); }
+
+    function getParentIonianInfo(modeRootPC, modeName){
+      const ionianDegreeOfModeRoot = MODE_TO_IONIAN_ROOT_DEGREE[modeName] ?? 1;
+      const stepToModeRoot = MAJOR_DEGREE_STEPS[ionianDegreeOfModeRoot - 1];
+      const parentRootPC = (modeRootPC - stepToModeRoot + 12) % 12;
+
+      const map = new Map();
+      for (let i=0; i<7; i++){
+        const pc = (parentRootPC + MAJOR_DEGREE_STEPS[i]) % 12;
+        map.set(pc, String(i+1));
+      }
+      return { parentRootPC, ionianDegreeOfModeRoot, ionianDegreeMap: map };
+    }
+
+    // ---------- UI ----------
+    const rootSel = document.getElementById("rootSel");
+    const modeSel = document.getElementById("modeSel");
+    const randomBtn = document.getElementById("randomBtn");
+    const fretboardEl = document.getElementById("fretboard");
+    const promptModeEl = document.getElementById("promptMode");
+    const promptMetaEl = document.getElementById("promptMeta");
+    const hintBox = document.getElementById("hintBox");
+    const showContrastEl = document.getElementById("showContrast");
+
+    function populateSelects(){
+      rootSel.innerHTML = "";
+      for (const n of NOTES){
+        const opt = document.createElement("option");
+        opt.value = n;
+        opt.textContent = n;
+        rootSel.appendChild(opt);
+      }
+      rootSel.value = "A";
+
+      modeSel.innerHTML = "";
+      for (const m of MODES){
+        const opt = document.createElement("option");
+        opt.value = m.name;
+        opt.textContent = m.name;
+        modeSel.appendChild(opt);
+      }
+      modeSel.value = "Mixolydian";
+    }
+
+    function getCurrentMode(){
+      const name = modeSel.value;
+      return MODES.find(m => m.name === name) || MODES[0];
+    }
+
+    function renderPrompt(){
+      const modeRoot = rootSel.value;
+      const modeRootPC = NOTE_TO_PC[modeRoot];
+      const mode = getCurrentMode();
+      const parent = getParentIonianInfo(modeRootPC, mode.name);
+
+      const parentRootName = pcToNote(parent.parentRootPC);
+      const rootAsDegree = parent.ionianDegreeOfModeRoot;
+
+      promptModeEl.textContent = `${modeRoot} ${mode.name}`;
+      promptMetaEl.textContent = `Parent: ${parentRootName} Ionian • ${modeRoot} = degree ${rootAsDegree}`;
+
+      const target = (mode.target || []).map(d => {
+        const pc = (modeRootPC + DEGREE_TO_SEMITONES[d]) % 12;
+        const ionDeg = parent.ionianDegreeMap.get(pc) || "?";
+        return `${d} (${pcToNote(pc)}) [Ionian ${ionDeg}]`;
+      }).join(", ");
+
+      const showContrast = showContrastEl.checked;
+      const contrast = (mode.contrast || []).map(d => {
+        const pc = (modeRootPC + DEGREE_TO_SEMITONES[d]) % 12;
+        const ionDeg = parent.ionianDegreeMap.get(pc) || "?";
+        return `${d} (${pcToNote(pc)}) [Ionian ${ionDeg}]`;
+      }).join(", ");
+
+      hintBox.innerHTML =
+        `<div><strong>Target (flavor):</strong> <strong>${target || "—"}</strong></div>` +
+        (showContrast && contrast
+          ? `<div style="margin-top:6px;"><strong>Contrast (red):</strong> ${contrast}</div>`
+          : `<div style="margin-top:6px;"><strong>Contrast:</strong> hidden</div>`) +
+        `<div style="margin-top:6px; color: var(--muted);">${mode.blurb}</div>`;
+    }
+
+    function renderFretboard(){
+      const modeRoot = rootSel.value;
+      const modeRootPC = NOTE_TO_PC[modeRoot];
+      const mode = getCurrentMode();
+      const parent = getParentIonianInfo(modeRootPC, mode.name);
+
+      const scalePCs = new Set(degreesToPCs(modeRootPC, mode.degrees));
+      const targetPCs = new Set(degreesToPCs(modeRootPC, mode.target || []));
+      const contrastPCs = new Set(degreesToPCs(modeRootPC, mode.contrast || []));
+
+      const maxFret = 12;
+      const grid = document.createElement("div");
+      grid.className = "fbGrid";
+      grid.style.gridTemplateColumns = `60px repeat(${maxFret + 1}, 44px)`;
+
+      // corner
+      const corner = document.createElement("div");
+      corner.className = "fbLabel";
+      corner.textContent = "";
+      grid.appendChild(corner);
+
+      // fret header
+      for (let f = 0; f <= maxFret; f++) {
+        const h = document.createElement("div");
+        h.className = "fbFret";
+        h.textContent = f;
+        grid.appendChild(h);
+      }
+
+      const showContrast = showContrastEl.checked;
+
+      for (const s of STRINGS_DISPLAY) {
+        const lab = document.createElement("div");
+        lab.className = "fbLabel";
+        lab.textContent = s.name;
+        grid.appendChild(lab);
+
+        for (let fret = 0; fret <= maxFret; fret++) {
+          const pc = (s.pc + fret) % 12;
+          const note = pcToNote(pc);
+
+          const cell = document.createElement("div");
+          cell.className = "cell";
+
+          // NEW: default to out-of-scale, then promote to in-scale
+          if (scalePCs.has(pc)) cell.classList.add("inScale");
+          else cell.classList.add("outScale");
+
+          if (pc === modeRootPC) cell.classList.add("rootNote");
+          if (targetPCs.has(pc)) cell.classList.add("identity");
+          if (showContrast && contrastPCs.has(pc)) cell.classList.add("avoid");
+
+          const noteSpan = document.createElement("span");
+          noteSpan.textContent = note;
+          cell.appendChild(noteSpan);
+
+          // Degree tags (Ionian-parent) only for in-scale notes
+          if (scalePCs.has(pc)) {
+            const ionDeg = parent.ionianDegreeMap.get(pc) || "";
+            const d = document.createElement("span");
+            d.className = "deg";
+            d.textContent = ionDeg;
+            cell.appendChild(d);
+          }
+
+          grid.appendChild(cell);
+        }
+      }
+
+      fretboardEl.innerHTML = "";
+      fretboardEl.appendChild(grid);
+    }
+
+    function updateAll(){
+      renderPrompt();
+      renderFretboard();
+    }
+
+    function randomizeMode(){
+      const i = Math.floor(Math.random() * MODES.length);
+      modeSel.value = MODES[i].name;
+      updateAll();
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      populateSelects();
+      updateAll();
+      rootSel.addEventListener("change", updateAll);
+      modeSel.addEventListener("change", updateAll);
+      showContrastEl.addEventListener("change", updateAll);
+      randomBtn.addEventListener("click", randomizeMode);
+    });
+  </script>
+</body>
+</html>
